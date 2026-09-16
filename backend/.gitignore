@@ -38,3 +38,16 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+### Local environment / secrets ###
+.env
+.env.*
+!.env.example
+local.properties
+
+### Local run scripts ###
+run-local.ps1
+
+### JVM crash logs ###
+hs_err_pid*.log
+replay_pid*.log
