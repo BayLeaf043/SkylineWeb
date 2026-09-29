@@ -22,7 +22,7 @@ export const theme = createTheme({
   },
 
   shape: {
-    borderRadius: 12,
+    borderRadius: 8,
   },
 
   typography: {
@@ -52,6 +52,7 @@ export const theme = createTheme({
   },
 
   components: {
+    // PAPER / CARDS
     MuiPaper: {
       styleOverrides: {
         root: {
@@ -61,11 +62,12 @@ export const theme = createTheme({
       },
     },
 
+    // BUTTONS
     MuiButton: {
       styleOverrides: {
         root: {
-          minHeight: 48,
-          borderRadius: 12,
+          minHeight: 44,
+          borderRadius: 8,
           boxShadow: "none",
         },
 
@@ -91,6 +93,16 @@ export const theme = createTheme({
       },
     },
 
+    // ICON BUTTONS
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+        },
+      },
+    },
+
+    // TEXT FIELDS
     MuiTextField: {
       defaultProps: {
         fullWidth: true,
@@ -100,7 +112,7 @@ export const theme = createTheme({
     MuiOutlinedInput: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
+          borderRadius: 8,
           backgroundColor: "rgba(255,255,255,0.025)",
 
           "& .MuiOutlinedInput-notchedOutline": {
@@ -130,11 +142,91 @@ export const theme = createTheme({
       },
     },
 
+    // ALERTS
     MuiAlert: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
+          borderRadius: 8,
         },
+      },
+    },
+
+    // MENUS
+    MuiMenu: {
+      styleOverrides: {
+        paper: {
+          backgroundColor: "#0d1a2b",
+          backgroundImage: "none",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: 12,
+          boxShadow: "0 16px 40px rgba(0,0,0,0.35)",
+        },
+      },
+    },
+
+    MuiMenuItem: {
+      styleOverrides: {
+        root: {
+          minHeight: 44,
+          margin: "6px 8px",
+          borderRadius: 8,
+
+          "&:hover": {
+            backgroundColor: "rgba(255,255,255,0.05)",
+          },
+        },
+      },
+    },
+
+    // DIALOGS
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          borderRadius: 12,
+          border: "1px solid rgba(255,255,255,0.08)",
+          backgroundImage: "none",
+        },
+      },
+    },
+
+    MuiDialogTitle: {
+      styleOverrides: {
+        root: {
+          padding: "24px 24px 8px",
+        },
+      },
+    },
+
+    MuiDialogContent: {
+      styleOverrides: {
+        root: {
+          paddingLeft: 24,
+          paddingRight: 24,
+        },
+      },
+    },
+
+    MuiDialogActions: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          padding: "20px 24px",
+          marginTop: 8,
+          borderTop: "1px solid rgba(255,255,255,0.08)",
+
+          [theme.breakpoints.down("sm")]: {
+            flexDirection: "column-reverse",
+            alignItems: "stretch",
+            gap: 8,
+
+            "& > :not(style) ~ :not(style)": {
+              marginLeft: 0,
+            },
+
+            "& .MuiButton-root": {
+              width: "100%",
+            },
+          },
+        }),
       },
     },
   },

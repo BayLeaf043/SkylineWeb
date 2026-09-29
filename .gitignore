@@ -19,3 +19,10 @@ backend/src/main/resources/application-local.yml
 # OS
 .DS_Store
 Thumbs.db
+
+# Root dependencies
+/node_modules/
+
+# JVM crash logs
+/hs_err_pid*.log
+/replay_pid*.log

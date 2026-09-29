@@ -2,32 +2,10 @@
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
 
-  color: #e8eef7;
-  background: #07111f;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  --bg-main: #07111f;
-  --bg-secondary: #0d1a2b;
-  --bg-card: rgba(13, 26, 43, 0.92);
-
-  --border: rgba(255, 255, 255, 0.08);
-
-  --text-primary: #f5f8fc;
-  --text-secondary: #92a3b9;
-
-  --accent: #2f8cff;
-  --accent-hover: #1f7ce8;
-  --accent-soft: rgba(47, 140, 255, 0.15);
-
-  --danger: #ef5350;
-
-  --shadow:
-    0 30px 80px rgba(0, 0, 0, 0.35),
-    0 10px 30px rgba(0, 0, 0, 0.2);
 }
 
 * {
@@ -44,22 +22,12 @@ body,
 
 body {
   min-height: 100vh;
-  background:
-    radial-gradient(
-      circle at 15% 10%,
-      rgba(47, 140, 255, 0.13),
-      transparent 34%
-    ),
-    radial-gradient(
-      circle at 85% 90%,
-      rgba(47, 140, 255, 0.08),
-      transparent 30%
-    ),
-    var(--bg-main);
 }
 
 button,
-input {
+input,
+textarea,
+select {
   font: inherit;
 }
 

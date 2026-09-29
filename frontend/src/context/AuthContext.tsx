@@ -18,6 +18,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   registerClub: (data: RegisterClubRequest) => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -133,6 +134,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         login,
         logout,
         registerClub,
+        refreshUser: loadCurrentUser,
       }}
     >
       {children}

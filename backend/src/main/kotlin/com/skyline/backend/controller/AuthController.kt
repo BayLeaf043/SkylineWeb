@@ -8,7 +8,6 @@ import com.skyline.backend.service.AuthService
 import com.skyline.backend.service.CurrentUserService
 import com.skyline.backend.dto.auth.CurrentUserResponse
 import com.skyline.backend.dto.auth.RefreshTokenRequest
-import java.util.UUID
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
@@ -37,39 +36,37 @@ class AuthController(
     fun login(
         @Valid @RequestBody request: LoginRequest
     ): LoginResponse {
-
-        println(">>> LOGIN CONTROLLER REACHED <<<")
-
         return authService.login(request)
     }
-    
+
     @GetMapping("/me")
     fun me(
         @AuthenticationPrincipal jwt: Jwt
     ): CurrentUserResponse {
 
-    val user = currentUserService.getUser(jwt)
+        val user = currentUserService.getUser(jwt)
 
-    return CurrentUserResponse(
-        userId = user.userId,
-        firstName = user.firstName,
-        lastName = user.lastName,
-        role = user.role.name,
-        clubId = user.club?.clubId,
-        clubName = user.club?.title)
+        return CurrentUserResponse(
+            userId = user.userId,
+            firstName = user.firstName,
+            lastName = user.lastName,
+            role = user.role.name,
+            clubId = user.club?.clubId,
+            clubName = user.club?.title
+        )
     }
-    
+
     @PostMapping("/refresh")
     fun refresh(
-       @Valid @RequestBody request: RefreshTokenRequest
+        @Valid @RequestBody request: RefreshTokenRequest
     ): LoginResponse {
         return authService.refresh(request)
     }
-    
+
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun logout(
-       @RequestHeader(HttpHeaders.AUTHORIZATION)
+        @RequestHeader(HttpHeaders.AUTHORIZATION)
         authorizationHeader: String
     ) {
         val accessToken = authorizationHeader

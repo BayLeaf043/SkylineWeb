@@ -10,8 +10,12 @@ import java.util.UUID
 class User(
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_id")
-    var userId: UUID = UUID.randomUUID(),
+    var userId: Long = 0,
+
+    @Column(name = "auth_user_id", unique = true)
+    var authUserId: UUID? = null,
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "club_id")
@@ -32,9 +36,25 @@ class User(
     @Column(nullable = false)
     var role: UserRole = UserRole.ADMIN,
 
-    @Column(name = "created_at", nullable = false)
+    @Column(
+        name = "created_at",
+        nullable = false,
+        updatable = false
+    )
     var createdAt: OffsetDateTime = OffsetDateTime.now(),
 
     @Column(nullable = false)
-    var status: Boolean = true
-)
+    var status: Boolean = true,
+
+    @Column(
+        name = "updated_at",
+        nullable = false
+    )
+    var updatedAt: OffsetDateTime = OffsetDateTime.now()
+) {
+
+    @PreUpdate
+    fun onUpdate() {
+        updatedAt = OffsetDateTime.now()
+    }
+}

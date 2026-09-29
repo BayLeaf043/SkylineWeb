@@ -15,12 +15,14 @@ class CurrentUserService(
 
     fun getUser(jwt: Jwt): User {
 
-        val userId = UUID.fromString(jwt.subject)
+        val authUserId =
+            UUID.fromString(jwt.subject)
 
-        val user = userRepository.findById(userId)
-            .orElseThrow {
-                IllegalStateException("User profile not found")
-            }
+        val user =
+            userRepository.findByAuthUserId(authUserId)
+                ?: throw IllegalStateException(
+                    "User profile not found"
+                )
 
         if (!user.status) {
             throw AccessDeniedException(

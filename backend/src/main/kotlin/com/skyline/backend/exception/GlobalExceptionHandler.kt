@@ -7,6 +7,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.http.ResponseEntity
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -68,5 +69,15 @@ class GlobalExceptionHandler {
         status = 401,
         error = "Unauthorized",
         message = ex.message ?: "Authentication failed"
+    )
+
+    @ExceptionHandler(NoSuchElementException::class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    fun handleNotFound(
+        ex: NoSuchElementException
+    ) = ApiError(
+        status = 404,
+        error = "Not Found",
+        message = ex.message ?: "Ресурс не знайдено"
     )
 }

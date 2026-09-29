@@ -3,7 +3,7 @@ package com.skyline.backend.dto.auth
 import java.util.UUID
 
 data class CurrentUserResponse(
-    val userId: UUID,
+    val userId: Long,
     val firstName: String,
     val lastName: String,
     val role: String,

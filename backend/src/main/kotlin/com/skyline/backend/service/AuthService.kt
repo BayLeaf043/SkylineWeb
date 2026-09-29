@@ -4,7 +4,6 @@ import com.skyline.backend.dto.auth.RegisterClubRequest
 import com.skyline.backend.dto.auth.RegisterClubResponse
 import com.skyline.backend.dto.auth.LoginRequest
 import com.skyline.backend.dto.auth.LoginResponse
-import com.skyline.backend.dto.auth.CurrentUserResponse
 import com.skyline.backend.entity.Club
 import com.skyline.backend.entity.User
 import com.skyline.backend.entity.UserRole
@@ -23,28 +22,30 @@ class AuthService(
 ) {
 
     @Transactional
-    fun registerClub(request: RegisterClubRequest): RegisterClubResponse {
-
+    fun registerClub(
+        request: RegisterClubRequest
+    ): RegisterClubResponse {
 
         var authUserId: UUID? = null
 
         try {
-            
             val club = Club(
                 title = request.clubName.trim(),
                 city = request.city?.trim(),
                 status = true
             )
 
-            val savedClub = clubRepository.save(club)
-            
-            authUserId = supabaseAuthService.createUser(
-                email = request.email.trim(),
-                password = request.password
-            )
+            val savedClub =
+                clubRepository.save(club)
+
+            authUserId =
+                supabaseAuthService.createUser(
+                    email = request.email.trim(),
+                    password = request.password
+                )
 
             val user = User(
-                userId = authUserId,
+                authUserId = authUserId,
                 club = savedClub,
                 firstName = request.firstName.trim(),
                 lastName = request.lastName.trim(),
@@ -52,12 +53,13 @@ class AuthService(
                 status = true
             )
 
-            userRepository.save(user)
+            val savedUser =
+                userRepository.save(user)
 
             return RegisterClubResponse(
-                userId = authUserId,
+                userId = savedUser.userId,
                 clubId = savedClub.clubId,
-                role = user.role.name,
+                role = savedUser.role.name,
                 message = "Club and administrator account created successfully"
             )
 
@@ -65,7 +67,9 @@ class AuthService(
 
             if (authUserId != null) {
                 runCatching {
-                    supabaseAuthService.deleteUser(authUserId)
+                    supabaseAuthService.deleteUser(
+                        authUserId
+                    )
                 }
             }
 

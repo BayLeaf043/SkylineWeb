@@ -159,6 +159,28 @@ class SupabaseAuthService(
             .retrieve()
             .toBodilessEntity()
     }
+
+
+    fun getUser(userId: UUID): AuthUserResponse {
+        try {
+            return restClient.get()
+                .uri("$supabaseUrl/auth/v1/admin/users/$userId")
+                .header(
+                    HttpHeaders.AUTHORIZATION,
+                    "Bearer $secretKey"
+                )
+                .header("apikey", secretKey)
+                .retrieve()
+                .body(AuthUserResponse::class.java)
+                ?: throw IllegalStateException(
+                    "Supabase did not return a user"
+                )
+        } catch (ex: RestClientResponseException) {
+            throw IllegalStateException(
+                "Unable to load authentication account"
+            )
+        }
+    }
 }
 
 
@@ -173,6 +195,11 @@ data class CreateAuthUserRequest(
 
 data class CreateAuthUserResponse(
     val id: UUID
+)
+
+data class AuthUserResponse(
+    val id: UUID,
+    val email: String?
 )
 
 data class LoginAuthResponse(

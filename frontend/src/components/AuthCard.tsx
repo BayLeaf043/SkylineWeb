@@ -1,5 +1,10 @@
 import type { ReactNode } from "react";
-import { Box, Container, Paper, } from "@mui/material";
+
+import {
+  Box,
+  Container,
+  Paper,
+} from "@mui/material";
 
 interface AuthCardProps {
   children: ReactNode;
@@ -14,34 +19,37 @@ export default function AuthCard({
     <Box
       sx={{
         minHeight: "100vh",
+
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        px: 2,
+
+        px: {
+          xs: 1,
+          sm: 2,
+        },
+
         py: {
-          xs: 3,
+          xs: 2,
           sm: 4,
         },
       }}
     >
-      <Container maxWidth={maxWidth}>
+      <Container
+        maxWidth={maxWidth}
+        disableGutters
+      >
         <Paper
-          elevation={0}
           sx={{
             p: {
-              xs: 3,
-              sm: 5,
+              xs: 2.5,
+              sm: 4,
             },
 
-            borderRadius: "22px",
-
-            background:
-              "linear-gradient(180deg, rgba(14, 28, 47, 0.96) 0%, rgba(10, 22, 38, 0.96) 100%)",
+            borderRadius: 1.5,
 
             boxShadow:
-              "0 30px 80px rgba(0, 0, 0, 0.35)",
-
-            backdropFilter: "blur(16px)",
+              "0 24px 60px rgba(0,0,0,0.28)",
           }}
         >
           {children}

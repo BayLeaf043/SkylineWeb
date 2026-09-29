@@ -23,9 +23,21 @@ class Club(
 
     var phone: String? = null,
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     var createdAt: OffsetDateTime = OffsetDateTime.now(),
 
     @Column(nullable = false)
-    var status: Boolean = true
-)
+    var status: Boolean = true,
+
+    @Column(name = "description")
+    var description: String? = null,
+
+    @Column(name = "updated_at", nullable = false)
+    var updatedAt: OffsetDateTime = OffsetDateTime.now()
+){
+
+    @PreUpdate
+    fun onUpdate() {
+        updatedAt = OffsetDateTime.now()
+    }
+}
