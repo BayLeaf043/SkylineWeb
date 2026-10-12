@@ -41,25 +41,27 @@ class AccountTransferService(
             )
         }
 
-        val fromAccount =
-            accountRepository
-                .findByAccountIdAndClubClubId(
-                    request.fromAccountId,
-                    club.clubId
-                )
-                ?: throw NoSuchElementException(
-                    "Рахунок списання не знайдено"
-                )
+        val accountIds = listOf(
+            request.fromAccountId,
+            request.toAccountId
+        ).sorted()
 
-        val toAccount =
-            accountRepository
-                .findByAccountIdAndClubClubId(
-                    request.toAccountId,
-                    club.clubId
-                )
-                ?: throw NoSuchElementException(
-                    "Рахунок зарахування не знайдено"
-                )
+        val lockedAccounts = accountIds.associateWith { accountId ->
+            accountRepository.findLockedByAccountIdAndClubClubId(
+                accountId,
+                club.clubId
+            ) ?: throw NoSuchElementException(
+                "Рахунок №$accountId не знайдено"
+            )
+        }
+
+        val fromAccount = lockedAccounts.getValue(
+            request.fromAccountId
+        )
+
+        val toAccount = lockedAccounts.getValue(
+            request.toAccountId
+        )
 
         if (!fromAccount.status) {
             throw ConflictException(

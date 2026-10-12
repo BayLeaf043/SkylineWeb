@@ -10,6 +10,8 @@ import com.skyline.backend.dto.profile.ProfileResponse
 import com.skyline.backend.dto.profile.UpdateProfileRequest
 import com.skyline.backend.dto.profile.ClubProfileResponse
 import com.skyline.backend.dto.profile.UpdateClubProfileRequest
+import com.skyline.backend.entity.User
+import com.skyline.backend.entity.Club
 
 
 @Service
@@ -20,150 +22,129 @@ class ProfileService(
     private val clubRepository: ClubRepository
 ) {
 
+    /**
+     * Повертає профіль поточного користувача.
+     * Доступ: ADMIN / TRAINER.
+     */
+    @Transactional(readOnly = true)
     fun getProfile(jwt: Jwt): ProfileResponse {
-
-        val user =
-            currentUserService.getUser(jwt)
-
-        val authUserId =
-            user.authUserId
-                ?: throw IllegalStateException(
-                    "Authentication account is not linked"
-                )
-
-        val authUser =
-            supabaseAuthService.getUser(authUserId)
-
-        return ProfileResponse(
-            userId = user.userId,
-            firstName = user.firstName,
-            lastName = user.lastName,
-            phone = user.phone,
-            birthDate = user.birthDate,
-            email = authUser.email ?: "",
-            role = user.role.name
-        )
+        val user = currentUserService.getUser(jwt)
+        return user.toProfileResponse()
     }
 
 
+    /**
+     * Оновлює особисті дані поточного користувача.
+     * Доступ: ADMIN / TRAINER.
+     */
     @Transactional
     fun updateProfile(
         jwt: Jwt,
         request: UpdateProfileRequest
     ): ProfileResponse {
+        val user = currentUserService.getUser(jwt)
 
-        val user =
-            currentUserService.getUser(jwt)
+        user.apply {
+            firstName = request.firstName.trim()
+            lastName = request.lastName.trim()
+            phone = request.phone.normalizeOptional()
+            birthDate = request.birthDate
+        }
 
-        user.firstName =
-            request.firstName.trim()
-
-        user.lastName =
-            request.lastName.trim()
-
-        user.phone =
-            request.phone
-                ?.trim()
-                ?.takeIf { it.isNotEmpty() }
-
-        user.birthDate =
-            request.birthDate
-
-        val savedUser =
-            userRepository.save(user)
-
-        val authUserId =
-            savedUser.authUserId
-                ?: throw IllegalStateException(
-                    "Authentication account is not linked"
-                )
-
-        val authUser =
-            supabaseAuthService.getUser(authUserId)
-
-        return ProfileResponse(
-            userId = savedUser.userId,
-            firstName = savedUser.firstName,
-            lastName = savedUser.lastName,
-            phone = savedUser.phone,
-            birthDate = savedUser.birthDate,
-            email = authUser.email ?: "",
-            role = savedUser.role.name
-        )
+        val savedUser = userRepository.save(user)
+        return savedUser.toProfileResponse()
     }
 
 
+    /**
+     * Повертає інформацію лише про клуб
+     * поточного користувача.
+     * Доступ: ADMIN / TRAINER.
+     */
+    @Transactional(readOnly = true)
     fun getClub(jwt: Jwt): ClubProfileResponse {
+        val user = currentUserService.getUser(jwt)
+        val club = user.requireClub()
 
-        val user =
-            currentUserService.getUser(jwt)
-
-        val club = user.club
-            ?: throw IllegalStateException(
-                "User is not assigned to a club"
-            )
-
-        return ClubProfileResponse(
-            clubId = club.clubId,
-            title = club.title,
-            city = club.city,
-            address = club.address,
-            phone = club.phone,
-            email = club.email,
-            description = club.description
-        )
+        return club.toClubProfileResponse()
     }
 
 
+    /**
+     * Оновлює дані спортивного комплексу.
+     * Доступ: тільки ADMIN.
+     */
     @Transactional
     fun updateClub(
         jwt: Jwt,
         request: UpdateClubProfileRequest
     ): ClubProfileResponse {
+        val user = currentUserService.requireAdmin(jwt)
+        val club = user.requireClub()
 
-        val user =
-            currentUserService.requireAdmin(jwt)
+        club.apply {
+            title = request.title.trim()
+            city = request.city.normalizeOptional()
+            address = request.address.normalizeOptional()
+            phone = request.phone.normalizeOptional()
+            email = request.email.normalizeOptional()
+            description = request.description.normalizeOptional()
+        }
 
-        val club = user.club
+        val savedClub = clubRepository.save(club)
+        return savedClub.toClubProfileResponse()
+    }
+
+
+    /**
+     * Формує DTO профілю та отримує email із Supabase.
+     */
+    private fun User.toProfileResponse(): ProfileResponse {
+        val authUserId = authUserId
             ?: throw IllegalStateException(
-                "User is not assigned to a club"
+                "Authentication account is not linked"
             )
 
-        club.title =
-            request.title.trim()
+        val authUser = supabaseAuthService.getUser(authUserId)
 
-        club.city = request.city
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-
-        club.address = request.address
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-
-        club.phone = request.phone
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-
-        club.email = request.email
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-
-        club.description =
-            request.description
-                ?.trim()
-                ?.takeIf { it.isNotEmpty() }
-
-        val savedClub =
-            clubRepository.save(club)
-
-        return ClubProfileResponse(
-            clubId = savedClub.clubId,
-            title = savedClub.title,
-            city = savedClub.city,
-            address = savedClub.address,
-            phone = savedClub.phone,
-            email = savedClub.email,
-            description = savedClub.description
+        return ProfileResponse(
+            userId = userId,
+            firstName = firstName,
+            lastName = lastName,
+            phone = phone,
+            birthDate = birthDate,
+            email = authUser.email ?: "",
+            role = role.name
         )
     }
+
+    /**
+     * Формує DTO спортивного комплексу.
+     */
+    private fun Club.toClubProfileResponse() =
+        ClubProfileResponse(
+            clubId = clubId,
+            title = title,
+            city = city,
+            address = address,
+            phone = phone,
+            email = email,
+            description = description
+        )
+
+    /**
+     * Повертає клуб користувача або повідомляє
+     * про відсутність відповідного зв'язку.
+     */
+    private fun User.requireClub(): Club =
+        club ?: throw IllegalStateException(
+            "User is not assigned to a club"
+        )
+
+    /**
+     * Видаляє зайві пробіли.
+     * Порожні необов'язкові значення перетворює на null.
+     */
+    private fun String?.normalizeOptional(): String? =
+        this?.trim()?.takeIf { it.isNotEmpty() }
 }

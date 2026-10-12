@@ -13,4 +13,9 @@ interface UserRepository : JpaRepository<User, Long>{
     fun findByAuthUserId(
         authUserId: UUID
     ): User?
+
+    fun findByUserIdAndClubClubId(
+        userId: Long,
+        clubId: Long
+    ): User?
 }

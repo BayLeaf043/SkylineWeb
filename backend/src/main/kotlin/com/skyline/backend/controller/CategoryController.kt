@@ -11,6 +11,10 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.*
 
+/**
+ * Керування категоріями спортивного комплексу.
+ * Усі операції доступні тільки ADMIN.
+ */
 @RestController
 @RequestMapping("/api/categories")
 class CategoryController(
@@ -23,7 +27,6 @@ class CategoryController(
         @AuthenticationPrincipal jwt: Jwt,
         @Valid @RequestBody request: CreateCategoryRequest
     ): CategoryResponse {
-
         return categoryService.createCategory(jwt, request)
     }
 
@@ -32,7 +35,6 @@ class CategoryController(
     fun getAll(
         @AuthenticationPrincipal jwt: Jwt
     ): List<CategoryResponse> {
-
         return categoryService.getAll(jwt)
     }
 
@@ -42,7 +44,6 @@ class CategoryController(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable categoryId: Long
     ): CategoryResponse {
-
         return categoryService.getById(jwt, categoryId)
     }
 
@@ -53,7 +54,6 @@ class CategoryController(
         @PathVariable categoryId: Long,
         @Valid @RequestBody request: UpdateCategoryRequest
     ): CategoryResponse {
-
         return categoryService.updateCategory(jwt, categoryId, request)
     }
 
@@ -62,7 +62,7 @@ class CategoryController(
     fun updateCategoryStatus(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable categoryId: Long,
-        @RequestBody request: UpdateCategoryStatusRequest
+        @Valid @RequestBody request: UpdateCategoryStatusRequest
     ): CategoryResponse {
         return categoryService.updateCategoryStatus(categoryId, request, jwt)
     }
@@ -74,7 +74,6 @@ class CategoryController(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable categoryId: Long
     ) {
-
         categoryService.deleteCategory(jwt, categoryId)
     }
 }

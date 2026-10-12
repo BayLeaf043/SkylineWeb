@@ -12,6 +12,7 @@ import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
 import org.springframework.security.oauth2.jwt.Jwt
+import com.skyline.backend.exception.UnauthorizedException
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.http.HttpHeaders
 import org.springframework.web.bind.annotation.RequestHeader
@@ -43,7 +44,6 @@ class AuthController(
     fun me(
         @AuthenticationPrincipal jwt: Jwt
     ): CurrentUserResponse {
-
         val user = currentUserService.getUser(jwt)
 
         return CurrentUserResponse(
@@ -70,8 +70,13 @@ class AuthController(
         authorizationHeader: String
     ) {
         val accessToken = authorizationHeader
-            .removePrefix("Bearer ")
-            .trim()
+            .takeIf { it.startsWith("Bearer ", ignoreCase = true) }
+            ?.substringAfter(" ")
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: throw UnauthorizedException(
+                "Некоректний токен авторизації"
+            )
 
         authService.logout(accessToken)
     }

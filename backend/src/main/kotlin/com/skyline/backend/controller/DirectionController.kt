@@ -23,7 +23,6 @@ class DirectionController(
         @AuthenticationPrincipal jwt: Jwt,
         @Valid @RequestBody request: CreateDirectionRequest
     ): DirectionResponse {
-
         return directionService.createDirection(jwt, request)
     }
 
@@ -32,7 +31,6 @@ class DirectionController(
     fun getAll(
         @AuthenticationPrincipal jwt: Jwt
     ): List<DirectionResponse> {
-
         return directionService.getAll(jwt)
     }
 
@@ -42,7 +40,6 @@ class DirectionController(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable directionId: Long
     ): DirectionResponse {
-
         return directionService.getById(jwt, directionId)
     }
 
@@ -53,7 +50,6 @@ class DirectionController(
         @PathVariable directionId: Long,
         @Valid @RequestBody request: UpdateDirectionRequest
     ): DirectionResponse {
-
         return directionService.updateDirection(jwt, directionId, request)
     }
 
@@ -62,7 +58,7 @@ class DirectionController(
     fun updateDirectionStatus(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable directionId: Long,
-        @RequestBody request: UpdateDirectionStatusRequest
+        @Valid @RequestBody request: UpdateDirectionStatusRequest
     ): DirectionResponse {
         return directionService.updateDirectionStatus(directionId, request, jwt)
     }
@@ -74,7 +70,6 @@ class DirectionController(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable directionId: Long
     ) {
-
         directionService.deleteDirection(jwt, directionId)
     }
 }

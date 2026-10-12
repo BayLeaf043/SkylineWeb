@@ -18,4 +18,10 @@ interface HallRepository : JpaRepository<Hall, Long> {
         clubId: Long,
         title: String
     ): Boolean
+
+    fun existsByClubClubIdAndTitleIgnoreCaseAndHallIdNot(
+        clubId: Long,
+        title: String,
+        hallId: Long
+    ): Boolean
 }

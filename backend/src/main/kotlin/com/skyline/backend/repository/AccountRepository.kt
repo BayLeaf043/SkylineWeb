@@ -2,6 +2,10 @@ package com.skyline.backend.repository
 
 import com.skyline.backend.entity.Account
 import org.springframework.data.jpa.repository.JpaRepository
+import jakarta.persistence.LockModeType
+import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 
 interface AccountRepository : JpaRepository<Account, Long> {
 
@@ -24,4 +28,18 @@ interface AccountRepository : JpaRepository<Account, Long> {
         title: String,
         accountId: Long
     ): Boolean
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+    SELECT a
+    FROM Account a
+    WHERE a.accountId = :accountId
+      AND a.club.clubId = :clubId
+    """
+    )
+    fun findLockedByAccountIdAndClubClubId(
+        @Param("accountId") accountId: Long,
+        @Param("clubId") clubId: Long
+    ): Account?
 }

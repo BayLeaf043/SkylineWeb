@@ -12,6 +12,11 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.*
 
+
+/**
+ * Керування залами спортивного комплексу.
+ * Усі операції доступні тільки ADMIN.
+ */
 @RestController
 @RequestMapping("/api/halls")
 class HallController(

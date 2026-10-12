@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.*
+import com.skyline.backend.dto.certificate.CertificatePageResponse
 
 @RestController
 @RequestMapping("/api/certificates")
@@ -54,5 +55,74 @@ class CertificateController(
     ) {
 
         certificateService.deleteCertificate(jwt, certificateId)
+    }
+
+
+    @GetMapping("/available")
+    fun getAvailableForSession(
+        @RequestParam sessionId: Long,
+        @RequestParam clientId: Long,
+        @AuthenticationPrincipal jwt: Jwt
+    ): List<CertificateResponse> {
+
+        return certificateService.getAvailableForSession(jwt = jwt, sessionId = sessionId, clientId = clientId)
+    }
+
+
+    @GetMapping("/active")
+    fun getActivePage(
+        @RequestParam(defaultValue = "0")
+        page: Int,
+
+        @RequestParam(defaultValue = "20")
+        size: Int,
+
+        @AuthenticationPrincipal
+        jwt: Jwt,
+
+        @RequestParam(defaultValue = "")
+        search: String,
+    ): CertificatePageResponse {
+
+        return certificateService
+            .getActivePage(
+                jwt = jwt,
+                page = page,
+                size = size,
+                search = search
+            )
+    }
+
+
+    @GetMapping("/archive")
+    fun getArchivePage(
+        @RequestParam(defaultValue = "0")
+        page: Int,
+
+        @RequestParam(defaultValue = "20")
+        size: Int,
+
+        @RequestParam
+        year: Int,
+
+        @RequestParam
+        month: Int,
+
+        @AuthenticationPrincipal
+        jwt: Jwt,
+
+        @RequestParam(defaultValue = "")
+        search: String,
+    ): CertificatePageResponse {
+
+        return certificateService
+            .getArchivePage(
+                jwt = jwt,
+                page = page,
+                size = size,
+                year = year,
+                month = month,
+                search = search
+            )
     }
 }

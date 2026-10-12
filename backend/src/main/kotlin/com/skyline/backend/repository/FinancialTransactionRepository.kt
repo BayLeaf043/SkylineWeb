@@ -7,6 +7,9 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.math.BigDecimal
 import com.skyline.backend.entity.FinancialTransactionType
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import java.time.OffsetDateTime
 
 interface FinancialTransactionRepository :
     JpaRepository<FinancialTransaction, Long> {
@@ -115,4 +118,55 @@ interface FinancialTransactionRepository :
         accountId: Long,
         type: FinancialTransactionType
     ): Boolean
+
+
+    @Query(
+        """
+    SELECT ft
+    FROM FinancialTransaction ft
+    JOIN ft.account a
+    WHERE ft.club.clubId = :clubId
+
+      AND ft.createdAt >= :from
+      AND ft.createdAt < :to
+
+      AND (
+          :type IS NULL
+          OR ft.type = :type
+      )
+
+      AND (
+          :search = ''
+          OR LOWER(a.title)
+              LIKE LOWER(CONCAT('%', :search, '%'))
+          OR LOWER(COALESCE(ft.comment, ''))
+              LIKE LOWER(CONCAT('%', :search, '%'))
+          OR (
+              :searchId IS NOT NULL
+              AND ft.transactionId = :searchId
+          )
+      )
+    """
+    )
+    fun findPage(
+        @Param("clubId")
+        clubId: Long,
+
+        @Param("from")
+        from: OffsetDateTime,
+
+        @Param("to")
+        to: OffsetDateTime,
+
+        @Param("type")
+        type: FinancialTransactionType?,
+
+        @Param("search")
+        search: String,
+
+        @Param("searchId")
+        searchId: Long?,
+
+        pageable: Pageable
+    ): Page<FinancialTransaction>
 }

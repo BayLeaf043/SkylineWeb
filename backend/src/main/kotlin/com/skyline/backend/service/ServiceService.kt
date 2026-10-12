@@ -2,6 +2,9 @@ package com.skyline.backend.service
 
 import com.skyline.backend.dto.service.CreateServiceRequest
 import com.skyline.backend.dto.service.ServiceResponse
+import com.skyline.backend.entity.Club
+import com.skyline.backend.entity.Category
+import com.skyline.backend.entity.Direction
 import com.skyline.backend.repository.DirectionRepository
 import com.skyline.backend.dto.service.UpdateServiceStatusRequest
 import com.skyline.backend.dto.service.UpdateServiceRequest
@@ -13,27 +16,26 @@ import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import com.skyline.backend.repository.PurchaseRepository
 
 @Service
 class ServiceService(
     private val serviceRepository: ServiceRepository,
     private val categoryRepository: CategoryRepository,
     private val directionRepository: DirectionRepository,
+    private val purchaseRepository: PurchaseRepository,
     private val currentUserService: CurrentUserService
 ) {
 
+    // =========================================================
+    // ОТРИМАННЯ ПОСЛУГ
+    // =========================================================
     @Transactional(readOnly = true)
     fun getAll(jwt: Jwt): List<ServiceResponse> {
-
-        val user = currentUserService.requireAdmin(jwt)
-
-        val clubId = user.club?.clubId
-            ?: throw AccessDeniedException(
-                "Користувач не прив'язаний до спортивного клубу"
-            )
+        val club = requireAdminClub(jwt)
 
         return serviceRepository
-            .findAllByClubClubIdOrderByTitleAsc(clubId)
+            .findAllByClubClubIdOrderByTitleAsc(club.clubId)
             .map { it.toResponse() }
     }
 
@@ -42,78 +44,32 @@ class ServiceService(
         serviceId: Long,
         jwt: Jwt
     ): ServiceResponse {
+        val club = requireAdminClub(jwt)
 
-        val user = currentUserService.requireAdmin(jwt)
-
-        val clubId = user.club?.clubId
-            ?: throw AccessDeniedException(
-                "Користувач не прив'язаний до спортивного клубу"
-            )
-
-        val service = serviceRepository
-            .findByServiceIdAndClubClubId(
-                serviceId,
-                clubId
-            )
-            ?: throw NoSuchElementException(
-                "Послугу не знайдено"
-            )
-
-        return service.toResponse()
+        return findService(serviceId, club.clubId).toResponse()
     }
 
+    // =========================================================
+    // СТВОРЕННЯ ТА РЕДАГУВАННЯ
+    // =========================================================
     @Transactional
     fun createService(
         request: CreateServiceRequest,
         jwt: Jwt
     ): ServiceResponse {
-
-        val user = currentUserService.requireAdmin(jwt)
-
-        val club = user.club
-            ?: throw AccessDeniedException(
-                "Користувач не прив'язаний до спортивного клубу"
-            )
-
-        val clubId = club.clubId
+        val club = requireAdminClub(jwt)
         val title = request.title.trim()
 
-        if (
-            serviceRepository.existsByClubClubIdAndTitleIgnoreCase(
-                clubId,
-                title
-            )
-        ) {
-            throw ConflictException(
-                "Послуга з такою назвою вже існує"
-            )
-        }
+        validateUniqueTitle(club.clubId, title)
 
-        // Шукаємо категорію тільки в межах клубу поточного ADMIN.
-        val category = categoryRepository
-            .findByCategoryIdAndClubClubId(
-                request.categoryId,
-                clubId
-            )
-            ?: throw NoSuchElementException(
-                "Категорію не знайдено"
-            )
+        val category = findCategory(request.categoryId, club.clubId)
+        val direction = findDirection(request.directionId, club.clubId)
 
         if (!category.status) {
             throw ConflictException(
                 "Неможливо створити послугу в неактивній категорії"
             )
         }
-
-
-        val direction = directionRepository
-            .findByDirectionIdAndClubClubId(
-                request.directionId,
-                clubId
-            )
-            ?: throw NoSuchElementException(
-                "Напрямок не знайдено"
-            )
 
         if (!direction.status) {
             throw ConflictException(
@@ -126,18 +82,14 @@ class ServiceService(
             category = category,
             direction = direction,
             title = title,
-            description = request.description
-                ?.trim()
-                ?.takeIf { it.isNotEmpty() },
+            description = request.description.normalizeOptional(),
             price = request.price,
             sessionsCount = request.sessionsCount,
             validityDays = request.validityDays,
             status = true
         )
 
-        return serviceRepository
-            .save(service)
-            .toResponse()
+        return serviceRepository.save(service).toResponse()
     }
 
     @Transactional
@@ -146,63 +98,17 @@ class ServiceService(
         request: UpdateServiceRequest,
         jwt: Jwt
     ): ServiceResponse {
-
-        val user = currentUserService.requireAdmin(jwt)
-
-        val clubId = user.club?.clubId
-            ?: throw AccessDeniedException(
-                "Користувач не прив'язаний до спортивного клубу"
-            )
-
-        val service = serviceRepository
-            .findByServiceIdAndClubClubId(
-                serviceId,
-                clubId
-            )
-            ?: throw NoSuchElementException(
-                "Послугу не знайдено"
-            )
-
+        val club = requireAdminClub(jwt)
+        val service = findService(serviceId, club.clubId)
         val title = request.title.trim()
 
-        if (
-            serviceRepository
-                .existsByClubClubIdAndTitleIgnoreCaseAndServiceIdNot(
-                    clubId,
-                    title,
-                    serviceId
-                )
-        ) {
-            throw ConflictException(
-                "Послуга з такою назвою вже існує"
-            )
-        }
+        validateUniqueTitle(club.clubId, title, serviceId)
 
-        val category = categoryRepository
-            .findByCategoryIdAndClubClubId(
-                request.categoryId,
-                clubId
-            )
-            ?: throw NoSuchElementException(
-                "Категорію не знайдено"
-            )
+        val category = findCategory(request.categoryId, club.clubId)
+        val direction = findDirection(request.directionId, club.clubId)
 
-        val direction = directionRepository
-            .findByDirectionIdAndClubClubId(
-                request.directionId,
-                clubId
-            )
-            ?: throw NoSuchElementException(
-                "Напрямок не знайдено"
-            )
-
-        /*
-         * Не дозволяємо переводити послугу в неактивну категорію.
-         *
-         * Виняток: якщо послуга вже знаходиться саме в цій категорії,
-         * адмін повинен мати можливість редагувати інші її поля
-         * або зробити саму послугу неактивною.
-         */
+        // Дозволяємо зберегти поточну неактивну категорію,
+        // але забороняємо переносити послугу в іншу неактивну.
         if (
             !category.status &&
             service.category?.categoryId != category.categoryId
@@ -221,49 +127,31 @@ class ServiceService(
             )
         }
 
-        service.category = category
-        service.direction = direction
-        service.title = title
-        service.description = request.description
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
+        service.apply {
+            this.category = category
+            this.direction = direction
+            this.title = title
+            description = request.description.normalizeOptional()
+            price = request.price
+            sessionsCount = request.sessionsCount
+            validityDays = request.validityDays
+        }
 
-        service.price = request.price
-        service.sessionsCount = request.sessionsCount
-        service.validityDays = request.validityDays
-
-        return serviceRepository
-            .save(service)
-            .toResponse()
+        return serviceRepository.save(service).toResponse()
     }
 
+    // =========================================================
+    // АКТИВАЦІЯ ТА ДЕАКТИВАЦІЯ
+    // =========================================================
     @Transactional
     fun updateServiceStatus(
         serviceId: Long,
         request: UpdateServiceStatusRequest,
         jwt: Jwt
     ): ServiceResponse {
+        val club = requireAdminClub(jwt)
+        val service = findService(serviceId, club.clubId)
 
-        val user = currentUserService.requireAdmin(jwt)
-
-        val clubId = user.club?.clubId
-            ?: throw AccessDeniedException(
-                "Користувач не прив'язаний до спортивного клубу"
-            )
-
-        val service = serviceRepository
-            .findByServiceIdAndClubClubId(
-                serviceId,
-                clubId
-            )
-            ?: throw NoSuchElementException(
-                "Послугу не знайдено"
-            )
-
-        /*
-         * Активувати послугу можна лише тоді,
-         * коли її категорія також активна.
-         */
         if (request.status) {
             val category = service.category
                 ?: throw IllegalStateException(
@@ -290,63 +178,121 @@ class ServiceService(
 
         service.status = request.status
 
-        return serviceRepository
-            .save(service)
-            .toResponse()
+        return serviceRepository.save(service).toResponse()
     }
 
+    // =========================================================
+    // ВИДАЛЕННЯ
+    // =========================================================
+    /**
+     * Послугу можна фізично видалити лише тоді,
+     * коли вона не має історії покупок.
+     */
     @Transactional
     fun deleteService(
         serviceId: Long,
         jwt: Jwt
     ) {
+        val club = requireAdminClub(jwt)
+        val service = findService(serviceId, club.clubId)
 
-        val user = currentUserService.requireAdmin(jwt)
-
-        val clubId = user.club?.clubId
-            ?: throw AccessDeniedException(
-                "Користувач не прив'язаний до спортивного клубу"
+        if (purchaseRepository.existsByServiceServiceId(serviceId)) {
+            throw ConflictException(
+                "Неможливо видалити послугу, оскільки вона " +
+                        "вже була придбана. Деактивуйте послугу " +
+                        "замість видалення"
             )
-
-        val service = serviceRepository
-            .findByServiceIdAndClubClubId(
-                serviceId,
-                clubId
-            )
-            ?: throw NoSuchElementException(
-                "Послугу не знайдено"
-            )
-
-        /*
-         * TODO:
-         * Перед фізичним видаленням перевірити,
-         * чи використовувалася послуга:
-         *
-         * - у придбаних абонементах;
-         * - платежах;
-         * - бронюваннях;
-         * - інших історичних записах.
-         *
-         * Якщо використовується:
-         * throw ConflictException(...)
-         *
-         * У такому випадку послугу потрібно
-         * зробити неактивною через status = false.
-         */
+        }
 
         serviceRepository.delete(service)
     }
 
-    private fun ServiceEntity.toResponse(): ServiceResponse {
+    // =========================================================
+    // ПЕРЕВІРКА ДОСТУПУ ТА ПОШУК
+    // =========================================================
+    private fun requireAdminClub(jwt: Jwt): Club {
+        val user = currentUserService.requireAdmin(jwt)
 
+        return user.club
+            ?: throw AccessDeniedException(
+                "Користувач не прив'язаний до спортивного клубу"
+            )
+    }
+
+    private fun findService(
+        serviceId: Long,
+        clubId: Long
+    ): ServiceEntity =
+        serviceRepository.findByServiceIdAndClubClubId(
+            serviceId,
+            clubId
+        ) ?: throw NoSuchElementException(
+            "Послугу не знайдено"
+        )
+
+    private fun findCategory(
+        categoryId: Long,
+        clubId: Long
+    ): Category =
+        categoryRepository.findByCategoryIdAndClubClubId(
+            categoryId,
+            clubId
+        ) ?: throw NoSuchElementException(
+            "Категорію не знайдено"
+        )
+
+    private fun findDirection(
+        directionId: Long,
+        clubId: Long
+    ): Direction =
+        directionRepository.findByDirectionIdAndClubClubId(
+            directionId,
+            clubId
+        ) ?: throw NoSuchElementException(
+            "Напрямок не знайдено"
+        )
+
+    private fun validateUniqueTitle(
+        clubId: Long,
+        title: String,
+        excludeServiceId: Long? = null
+    ) {
+        val exists = if (excludeServiceId == null) {
+            serviceRepository.existsByClubClubIdAndTitleIgnoreCase(
+                clubId,
+                title
+            )
+        } else {
+            serviceRepository
+                .existsByClubClubIdAndTitleIgnoreCaseAndServiceIdNot(
+                    clubId,
+                    title,
+                    excludeServiceId
+                )
+        }
+
+        if (exists) {
+            throw ConflictException(
+                "Послуга з такою назвою вже існує"
+            )
+        }
+    }
+
+    // =========================================================
+    // ДОПОМІЖНІ МЕТОДИ
+    // =========================================================
+    private fun String?.normalizeOptional(): String? =
+        this?.trim()?.takeIf { it.isNotEmpty() }
+
+    private fun ServiceEntity.toResponse(): ServiceResponse {
         val category = category
             ?: throw IllegalStateException(
-                "Service category is missing"
+                "Категорія послуги відсутня"
             )
 
         val direction = direction
             ?: throw IllegalStateException(
-                "Service direction is missing"
+                "Напрямок послуги відсутній"
             )
 
         return ServiceResponse(

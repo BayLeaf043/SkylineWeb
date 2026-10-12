@@ -24,7 +24,16 @@ data class UpdateEmployeeRequest(
     @field:NotNull(message = "Дата народження є обов'язковою")
     val birthDate: LocalDate,
 
+    @field:Size(
+        max = 255,
+        message = "Спеціалізація не може містити більше 255 символів"
+    )
     val specialization: String?,
+
+    @field:Size(
+        max = 2000,
+        message = "Опис не може містити більше 2000 символів"
+    )
     val description: String?,
 
     @field:Min(

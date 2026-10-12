@@ -11,14 +11,19 @@ import com.skyline.backend.repository.ClubRepository
 import com.skyline.backend.repository.UserRepository
 import com.skyline.backend.dto.auth.RefreshTokenRequest
 import org.springframework.stereotype.Service
+import org.springframework.security.oauth2.jwt.JwtDecoder
+import org.springframework.security.oauth2.jwt.JwtException
 import org.springframework.transaction.annotation.Transactional
+import com.skyline.backend.exception.UnauthorizedException
 import java.util.UUID
 
 @Service
 class AuthService(
     private val supabaseAuthService: SupabaseAuthService,
     private val clubRepository: ClubRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val jwtDecoder: JwtDecoder,
+    private val currentUserService: CurrentUserService
 ) {
 
     @Transactional
@@ -76,39 +81,63 @@ class AuthService(
             throw exception
         }
     }
-    
+
     fun login(request: LoginRequest): LoginResponse {
 
-        val result = supabaseAuthService.login(
-            request.email.trim(),
-            request.password
-    )
-
-        return LoginResponse(
-            accessToken = result.accessToken,
-            refreshToken = result.refreshToken,
-            expiresIn = result.expiresIn,
-            tokenType = result.tokenType
+        val session = supabaseAuthService.login(
+            email = request.email.trim(),
+            password = request.password
         )
+
+        validateSessionUser(session.accessToken)
+
+        return session.toLoginResponse()
     }
-    
+
     fun refresh(
         request: RefreshTokenRequest
-        ): LoginResponse {
+    ): LoginResponse {
 
-        val result = supabaseAuthService.refresh(
+        val session = supabaseAuthService.refresh(
             request.refreshToken
         )
 
-        return LoginResponse(
-            accessToken = result.accessToken,
-            refreshToken = result.refreshToken,
-            expiresIn = result.expiresIn,
-            tokenType = result.tokenType
-        )
+        validateSessionUser(session.accessToken)
+
+        return session.toLoginResponse()
     }
-    
+
     fun logout(accessToken: String) {
         supabaseAuthService.logout(accessToken)
     }
+
+
+    private fun validateSessionUser(accessToken: String) {
+
+        val jwt = try {
+            jwtDecoder.decode(accessToken)
+        } catch (ex: JwtException) {
+            throw UnauthorizedException(
+                "Не вдалося перевірити сесію користувача"
+            )
+        }
+
+        val user = try {
+            currentUserService.getUser(jwt)
+        } catch (ex: org.springframework.security.access.AccessDeniedException) {
+            throw UnauthorizedException(
+                "Обліковий запис недоступний або заблокований"
+            )
+        }
+
+    }
+
+
+    private fun LoginAuthResponse.toLoginResponse() =
+        LoginResponse(
+            accessToken = accessToken,
+            refreshToken = refreshToken,
+            expiresIn = expiresIn,
+            tokenType = tokenType
+        )
 }

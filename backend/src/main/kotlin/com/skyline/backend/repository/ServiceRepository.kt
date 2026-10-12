@@ -25,4 +25,12 @@ interface ServiceRepository : JpaRepository<Service, Long> {
         serviceId: Long
     ): Boolean
 
+    fun existsByCategoryCategoryId(
+        categoryId: Long
+    ): Boolean
+
+    fun existsByDirectionDirectionId(
+        directionId: Long
+    ): Boolean
+
 }

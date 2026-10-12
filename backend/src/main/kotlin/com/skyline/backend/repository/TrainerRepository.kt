@@ -2,7 +2,6 @@ package com.skyline.backend.repository
 
 import com.skyline.backend.entity.Trainer
 import org.springframework.data.jpa.repository.JpaRepository
-import java.util.UUID
 
 interface TrainerRepository : JpaRepository<Trainer, Long>{
 
@@ -12,5 +11,10 @@ interface TrainerRepository : JpaRepository<Trainer, Long>{
 
     fun findByUserUserId(
         userId: Long
+    ): Trainer?
+
+    fun findByTrainerIdAndUserClubClubId(
+        trainerId: Long,
+        clubId: Long
     ): Trainer?
 }

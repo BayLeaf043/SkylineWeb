@@ -3,6 +3,7 @@ package com.skyline.backend.service
 import com.skyline.backend.dto.direction.UpdateDirectionStatusRequest
 import com.skyline.backend.dto.direction.UpdateDirectionRequest
 import com.skyline.backend.entity.Direction
+import com.skyline.backend.entity.Club
 import com.skyline.backend.dto.direction.DirectionResponse
 import com.skyline.backend.dto.direction.CreateDirectionRequest
 import com.skyline.backend.repository.DirectionRepository
@@ -11,26 +12,51 @@ import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import com.skyline.backend.repository.ServiceRepository
+import com.skyline.backend.repository.GroupRepository
+import com.skyline.backend.repository.SessionRepository
 
 @Service
 class DirectionService(
     private val directionRepository: DirectionRepository,
+    private val serviceRepository: ServiceRepository,
+    private val groupRepository: GroupRepository,
+    private val sessionRepository: SessionRepository,
     private val currentUserService: CurrentUserService
 ) {
 
+
+    // =========================================================
+    // ОТРИМАННЯ НАПРЯМКІВ
+    // =========================================================
+    @Transactional(readOnly = true)
+    fun getAll(jwt: Jwt): List<DirectionResponse> {
+        val club = requireAdminClub(jwt)
+
+        return directionRepository
+            .findAllByClubClubIdOrderByTitleAsc(club.clubId)
+            .map { it.toResponse() }
+    }
+
+    @Transactional(readOnly = true)
+    fun getById(
+        jwt: Jwt,
+        directionId: Long
+    ): DirectionResponse {
+        val club = requireAdminClub(jwt)
+        return findDirection(directionId, club.clubId).toResponse()
+    }
+
+
+    // =========================================================
+    // СТВОРЕННЯ ТА РЕДАГУВАННЯ
+    // =========================================================
     @Transactional
     fun createDirection(
         jwt: Jwt,
         request: CreateDirectionRequest
     ): DirectionResponse {
-
-        val user = currentUserService.requireAdmin(jwt)
-
-        val club = user.club
-            ?: throw AccessDeniedException(
-                "Користувач не прив'язаний до спортивного клубу"
-            )
-
+        val club = requireAdminClub(jwt)
         val title = request.title.trim()
 
         if (
@@ -50,50 +76,8 @@ class DirectionService(
             status = true
         )
 
-        val savedDirection = directionRepository.save(direction)
-
-        return savedDirection.toResponse()
+        return directionRepository.save(direction).toResponse()
     }
-
-
-    @Transactional(readOnly = true)
-    fun getAll(jwt: Jwt): List<DirectionResponse> {
-
-        val user = currentUserService.requireAdmin(jwt)
-
-        val clubId = user.club?.clubId
-            ?: throw AccessDeniedException(
-                "Користувач не прив'язаний до спортивного клубу"
-            )
-
-        return directionRepository
-            .findAllByClubClubIdOrderByTitleAsc(clubId)
-            .map { it.toResponse() }
-    }
-
-
-    @Transactional(readOnly = true)
-    fun getById(
-        jwt: Jwt,
-        directionId: Long
-    ): DirectionResponse {
-
-        val user = currentUserService.requireAdmin(jwt)
-
-        val clubId = user.club?.clubId
-            ?: throw AccessDeniedException(
-                "Користувач не прив'язаний до спортивного клубу"
-            )
-
-        val direction = directionRepository
-            .findByDirectionIdAndClubClubId(directionId, clubId)
-            ?: throw NoSuchElementException(
-                "Напрямок не знайдено"
-            )
-
-        return direction.toResponse()
-    }
-
 
     @Transactional
     fun updateDirection(
@@ -101,26 +85,14 @@ class DirectionService(
         directionId: Long,
         request: UpdateDirectionRequest
     ): DirectionResponse {
-
-        val user = currentUserService.requireAdmin(jwt)
-
-        val clubId = user.club?.clubId
-            ?: throw AccessDeniedException(
-                "Користувач не прив'язаний до спортивного клубу"
-            )
-
-        val direction = directionRepository
-            .findByDirectionIdAndClubClubId(directionId, clubId)
-            ?: throw NoSuchElementException(
-                "Напрямок не знайдено"
-            )
-
+        val club = requireAdminClub(jwt)
+        val direction = findDirection(directionId, club.clubId)
         val title = request.title.trim()
 
         if (
             directionRepository
                 .existsByClubClubIdAndTitleIgnoreCaseAndDirectionIdNot(
-                    clubId,
+                    club.clubId,
                     title,
                     directionId
                 )
@@ -132,86 +104,103 @@ class DirectionService(
 
         direction.title = title
 
-        val savedDirection = directionRepository.save(direction)
-
-        return savedDirection.toResponse()
+        return directionRepository.save(direction).toResponse()
     }
 
 
+    // =========================================================
+    // АКТИВАЦІЯ ТА ДЕАКТИВАЦІЯ
+    // =========================================================
     @Transactional
     fun updateDirectionStatus(
         directionId: Long,
         request: UpdateDirectionStatusRequest,
         jwt: Jwt
     ): DirectionResponse {
-
-        val currentAdmin =
-            currentUserService.requireAdmin(jwt)
-
-        val clubId = currentAdmin.club?.clubId
-            ?: throw AccessDeniedException(
-                "Користувач не прив'язаний до спортивного клубу"
-            )
-
-        val direction = directionRepository
-            .findByDirectionIdAndClubClubId(
-                directionId,
-                clubId
-            )
-            ?: throw NoSuchElementException(
-                "Напрямок не знайдено"
-            )
+        val club = requireAdminClub(jwt)
+        val direction = findDirection(directionId, club.clubId)
 
         direction.status = request.status
 
-        return directionRepository
-            .save(direction)
-            .toResponse()
+        return directionRepository.save(direction).toResponse()
     }
 
-
+    // =========================================================
+    // ВИДАЛЕННЯ
+    // =========================================================
+    /**
+     * Зберігаємо історичні дані: напрямок не можна
+     * фізично видалити, якщо він використовувався
+     * у послугах, групах або заняттях.
+     */
     @Transactional
     fun deleteDirection(
         jwt: Jwt,
         directionId: Long
     ) {
+        val club = requireAdminClub(jwt)
+        val direction = findDirection(directionId, club.clubId)
 
-        val user = currentUserService.requireAdmin(jwt)
-
-        val club = user.club
-            ?: throw AccessDeniedException(
-                "Користувач не прив'язаний до спортивного клубу"
+        if (
+            serviceRepository.existsByDirectionDirectionId(directionId)
+        ) {
+            throw ConflictException(
+                "Неможливо видалити напрямок, оскільки він " +
+                        "використовується у послугах. " +
+                        "Деактивуйте напрямок замість видалення"
             )
+        }
 
-        val direction = directionRepository
-            .findByDirectionIdAndClubClubId(
-                directionId,
-                club.clubId
+        if (
+            groupRepository.existsByDirectionDirectionId(directionId)
+        ) {
+            throw ConflictException(
+                "Неможливо видалити напрямок, оскільки він " +
+                        "використовується у групах. " +
+                        "Деактивуйте напрямок замість видалення"
             )
-            ?: throw NoSuchElementException(
-                "Напрямок не знайдено"
-            )
+        }
 
-        /*
-         * TODO:
-         * Before deleting the category, check whether
-         * it is used by any services.
-         *
-         * If the category is used:
-         * - physical deletion must be prohibited;
-         * - administrator should set status = false instead.
-         */
+        if (
+            sessionRepository.existsByDirectionDirectionId(directionId)
+        ) {
+            throw ConflictException(
+                "Неможливо видалити напрямок, оскільки він " +
+                        "використовується у заняттях. " +
+                        "Деактивуйте напрямок замість видалення"
+            )
+        }
 
         directionRepository.delete(direction)
     }
 
 
-    private fun Direction.toResponse(): DirectionResponse {
-        return DirectionResponse(
-            directionId = requireNotNull(directionId),
-            title = title,
-            status = status,
-            createdAt = createdAt
-        )
+    // Допоміжні методи
+
+    private fun requireAdminClub(jwt: Jwt): Club {
+        val user = currentUserService.requireAdmin(jwt)
+
+        return user.club
+            ?: throw AccessDeniedException(
+                "Користувач не прив'язаний до спортивного клубу"
+            )
     }
+
+    private fun findDirection(
+        directionId: Long,
+        clubId: Long
+    ): Direction {
+        return directionRepository
+            .findByDirectionIdAndClubClubId(directionId, clubId)
+            ?: throw NoSuchElementException(
+                "Напрямок не знайдено"
+            )
+    }
+
+    private fun Direction.toResponse() = DirectionResponse(
+        directionId = requireNotNull(directionId),
+        title = title,
+        status = status,
+        createdAt = createdAt
+    )
 }

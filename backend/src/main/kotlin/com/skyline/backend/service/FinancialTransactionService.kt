@@ -15,6 +15,11 @@ import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
+import com.skyline.backend.dto.financialTransaction.FinancialTransactionPageResponse
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
+import java.time.YearMonth
+import java.time.ZoneId
 
 @Service
 class FinancialTransactionService(
@@ -36,14 +41,10 @@ class FinancialTransactionService(
                 "Користувач не прив'язаний до спортивного клубу"
             )
 
-        val account = accountRepository
-            .findByAccountIdAndClubClubId(
-                request.accountId,
-                club.clubId
-            )
-            ?: throw NoSuchElementException(
-                "Рахунок не знайдено"
-            )
+        val account = lockAccounts(
+            clubId = club.clubId,
+            request.accountId
+        ).getValue(request.accountId)
 
         if (!account.status) {
             throw ConflictException(
@@ -107,6 +108,129 @@ class FinancialTransactionService(
 
 
     @Transactional(readOnly = true)
+    fun getPage(
+        jwt: Jwt,
+        page: Int,
+        size: Int,
+        year: Int,
+        month: Int,
+        type: FinancialTransactionType?,
+        search: String
+    ): FinancialTransactionPageResponse {
+
+        val user =
+            currentUserService.requireAdmin(jwt)
+
+        val clubId =
+            user.club?.clubId
+                ?: throw AccessDeniedException(
+                    "Користувач не прив'язаний до спортивного клубу"
+                )
+
+        if (page < 0) {
+            throw IllegalArgumentException(
+                "Номер сторінки не може бути від'ємним"
+            )
+        }
+
+        if (size !in 1..100) {
+            throw IllegalArgumentException(
+                "Кількість фінансових операцій на сторінці повинна бути від 1 до 100"
+            )
+        }
+
+        if (month !in 1..12) {
+            throw IllegalArgumentException(
+                "Некоректний номер місяця"
+            )
+        }
+
+        val yearMonth =
+            YearMonth.of(
+                year,
+                month
+            )
+
+        val zone =
+            ZoneId.of("Europe/Kyiv")
+
+        val from =
+            yearMonth
+                .atDay(1)
+                .atStartOfDay(zone)
+                .toOffsetDateTime()
+
+        val to =
+            yearMonth
+                .plusMonths(1)
+                .atDay(1)
+                .atStartOfDay(zone)
+                .toOffsetDateTime()
+
+        val normalizedSearch =
+            search.trim()
+
+        /*
+         * Якщо користувач ввів число,
+         * додатково шукаємо за ID операції.
+         */
+        val searchId =
+            normalizedSearch.toLongOrNull()
+
+        val pageable =
+            PageRequest.of(
+                page,
+                size,
+                Sort.by(
+                    Sort.Order.desc(
+                        "createdAt"
+                    ),
+                    Sort.Order.desc(
+                        "transactionId"
+                    )
+                )
+            )
+
+        val result =
+            financialTransactionRepository
+                .findPage(
+                    clubId = clubId,
+                    from = from,
+                    to = to,
+                    type = type,
+                    search = normalizedSearch,
+                    searchId = searchId,
+                    pageable = pageable
+                )
+
+        return FinancialTransactionPageResponse(
+            content =
+                result.content.map {
+                    it.toResponse()
+                },
+
+            page =
+                result.number,
+
+            size =
+                result.size,
+
+            totalElements =
+                result.totalElements,
+
+            totalPages =
+                result.totalPages,
+
+            first =
+                result.isFirst,
+
+            last =
+                result.isLast
+        )
+    }
+
+
+    @Transactional(readOnly = true)
     fun getById(
         jwt: Jwt,
         transactionId: Long
@@ -159,15 +283,19 @@ class FinancialTransactionService(
 
         validateManualTransaction(transaction)
 
-        val newAccount =
-            accountRepository
-                .findByAccountIdAndClubClubId(
-                    request.accountId,
-                    clubId
-                )
-                ?: throw NoSuchElementException(
-                    "Рахунок не знайдено"
-                )
+        val oldAccountId = requireNotNull(
+            transaction.account
+        ).accountId
+
+        val lockedAccounts = lockAccounts(
+            clubId = clubId,
+            oldAccountId,
+            request.accountId
+        )
+
+        val newAccount = lockedAccounts.getValue(
+            request.accountId
+        )
 
         if (!newAccount.status) {
             throw ConflictException(
@@ -223,6 +351,15 @@ class FinancialTransactionService(
 
         validateManualTransaction(transaction)
 
+        val accountId = requireNotNull(
+            transaction.account
+        ).accountId
+
+        lockAccounts(
+            clubId = clubId,
+            accountId
+        )
+
         /*
          * Видалення ручної INCOME-операції також не повинно
          * призвести до від'ємного балансу рахунку.
@@ -256,6 +393,32 @@ class FinancialTransactionService(
         financialTransactionRepository.delete(transaction)
     }
 
+
+    /**
+     * Блокує рахунки в однаковому порядку.
+     *
+     * Викликати лише всередині @Transactional.
+     * Усі рахунки повинні належати поточному клубу.
+     */
+    private fun lockAccounts(
+        clubId: Long,
+        vararg accountIds: Long
+    ): Map<Long, Account> {
+
+        return accountIds
+            .distinct()
+            .sorted()
+            .associateWith { accountId ->
+                accountRepository
+                    .findLockedByAccountIdAndClubClubId(
+                        accountId,
+                        clubId
+                    )
+                    ?: throw NoSuchElementException(
+                        "Рахунок №$accountId не знайдено"
+                    )
+            }
+    }
 
     private fun validateManualTransaction(
         transaction: FinancialTransaction

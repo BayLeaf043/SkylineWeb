@@ -10,6 +10,8 @@ import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
+import com.skyline.backend.dto.client.ClientPageResponse
+import com.skyline.backend.dto.client.ClientDetailsResponse
 
 @RestController
 @RequestMapping("/api/clients")
@@ -50,7 +52,7 @@ class ClientController(
     fun updateClientStatus(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable clientId: Long,
-        @RequestBody request: UpdateClientStatusRequest
+        @Valid @RequestBody request: UpdateClientStatusRequest
     ): ClientResponse =
         clientService.updateClientStatus(jwt, clientId, request)
 
@@ -62,4 +64,20 @@ class ClientController(
     ) {
         clientService.deleteClient(jwt, clientId)
     }
+
+    @GetMapping("/{clientId}/details")
+    fun getClientDetails(
+        @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable clientId: Long
+    ): ClientDetailsResponse =
+        clientService.getClientDetails(jwt, clientId)
+
+    @GetMapping("/page")
+    fun getClientsPage(
+        @AuthenticationPrincipal jwt: Jwt,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int,
+        @RequestParam(defaultValue = "") search: String
+    ): ClientPageResponse =
+        clientService.getClientsPage(jwt, page, size, search)
 }

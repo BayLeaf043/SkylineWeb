@@ -9,6 +9,8 @@ import org.springframework.http.HttpStatus
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.*
+import com.skyline.backend.dto.financialTransaction.FinancialTransactionPageResponse
+import com.skyline.backend.entity.FinancialTransactionType
 
 @RestController
 @RequestMapping("/api/financial-transactions")
@@ -22,6 +24,41 @@ class FinancialTransactionController(
     ): List<FinancialTransactionResponse> {
 
         return financialTransactionService.getAll(jwt)
+    }
+
+
+    @GetMapping("/page")
+    fun getPage(
+        @AuthenticationPrincipal jwt: Jwt,
+
+        @RequestParam(defaultValue = "0")
+        page: Int,
+
+        @RequestParam(defaultValue = "20")
+        size: Int,
+
+        @RequestParam
+        year: Int,
+
+        @RequestParam
+        month: Int,
+
+        @RequestParam(required = false)
+        type: FinancialTransactionType?,
+
+        @RequestParam(defaultValue = "")
+        search: String
+    ): FinancialTransactionPageResponse {
+
+        return financialTransactionService.getPage(
+            jwt = jwt,
+            page = page,
+            size = size,
+            year = year,
+            month = month,
+            type = type,
+            search = search
+        )
     }
 
 

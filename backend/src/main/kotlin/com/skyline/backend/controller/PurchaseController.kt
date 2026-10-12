@@ -6,6 +6,9 @@ import com.skyline.backend.dto.purchase.RefundPurchaseRequest
 import com.skyline.backend.service.PurchaseService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
+import com.skyline.backend.dto.purchase.PurchasePageResponse
+import com.skyline.backend.entity.PurchaseType
+import java.time.YearMonth
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.*
@@ -56,5 +59,36 @@ class PurchaseController(
     ): PurchaseResponse {
 
         return purchaseService.refundPurchase(jwt, purchaseId, request)
+    }
+
+
+    @GetMapping("/page")
+    fun getPage(
+        @AuthenticationPrincipal jwt: Jwt,
+
+        @RequestParam(defaultValue = "0")
+        page: Int,
+
+        @RequestParam(defaultValue = "20")
+        size: Int,
+
+        @RequestParam
+        year: Int,
+
+        @RequestParam
+        month: Int,
+
+        @RequestParam(required = false)
+        type: PurchaseType?
+    ): PurchasePageResponse {
+
+        return purchaseService.getPage(
+            jwt = jwt,
+            page = page,
+            size = size,
+            year = year,
+            month = month,
+            type = type
+        )
     }
 }

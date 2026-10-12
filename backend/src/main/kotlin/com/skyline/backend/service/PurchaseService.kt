@@ -3,6 +3,9 @@ package com.skyline.backend.service
 import com.skyline.backend.dto.purchase.CreatePurchaseRequest
 import com.skyline.backend.dto.purchase.PurchaseResponse
 import com.skyline.backend.dto.purchase.RefundPurchaseRequest
+import com.skyline.backend.entity.BookingType
+import com.skyline.backend.repository.AttendanceRepository
+import com.skyline.backend.repository.BookingRepository
 import com.skyline.backend.entity.Certificate
 import com.skyline.backend.entity.CertificateType
 import com.skyline.backend.entity.FinancialTransaction
@@ -16,10 +19,16 @@ import com.skyline.backend.repository.ClientRepository
 import com.skyline.backend.repository.FinancialTransactionRepository
 import com.skyline.backend.repository.PurchaseRepository
 import com.skyline.backend.repository.ServiceRepository
+import com.skyline.backend.dto.purchase.PurchasePageResponse
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
+import java.time.YearMonth
+import java.time.ZoneId
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDate
 
 @Service
 class PurchaseService(
@@ -29,7 +38,9 @@ class PurchaseService(
     private val clientRepository: ClientRepository,
     private val serviceRepository: ServiceRepository,
     private val accountRepository: AccountRepository,
-    private val currentUserService: CurrentUserService
+    private val currentUserService: CurrentUserService,
+    private val attendanceRepository: AttendanceRepository,
+    private val bookingRepository: BookingRepository,
 ) {
 
     @Transactional
@@ -81,7 +92,7 @@ class PurchaseService(
         }
 
         val account = accountRepository
-            .findByAccountIdAndClubClubId(
+            .findLockedByAccountIdAndClubClubId(
                 request.accountId,
                 club.clubId
             )
@@ -125,13 +136,20 @@ class PurchaseService(
                 service.validityDays.toLong() - 1
             )
 
+        val certificateType =
+            if (validTo.isBefore(LocalDate.now())) {
+                CertificateType.EXPIRED
+            } else {
+                CertificateType.ACTIVE
+            }
+
         val certificate = Certificate(
             purchase = savedPurchase,
             validFrom = request.validFrom,
             validTo = validTo,
             totalSessions = service.sessionsCount,
             usedSessions = 0,
-            type = CertificateType.ACTIVE,
+            type = certificateType,
             status = true
         )
 
@@ -218,7 +236,7 @@ class PurchaseService(
             )
 
         val purchase = purchaseRepository
-            .findByPurchaseIdAndClubClubId(
+            .findLockedByPurchaseIdAndClubClubId(
                 purchaseId,
                 club.clubId
             )
@@ -238,24 +256,54 @@ class PurchaseService(
             )
         }
 
-        val certificate =
-            certificateRepository
-                .findByPurchasePurchaseId(
-                    purchaseId
-                )
-                ?: throw NoSuchElementException(
-                    "Сертифікат покупки не знайдено"
-                )
+        val certificate = certificateRepository
+            .findByPurchasePurchaseId(purchaseId)
+            ?: throw NoSuchElementException(
+                "Сертифікат покупки не знайдено"
+            )
+
+        val lockedCertificate = certificateRepository
+            .findLockedByCertificateIdAndPurchaseClubClubId(
+                certificate.certificateId,
+                club.clubId
+            )
+            ?: throw NoSuchElementException(
+                "Сертифікат покупки не знайдено"
+            )
+
+        if (lockedCertificate.type == CertificateType.CANCELLED) {
+            throw ConflictException(
+                "Неможливо повернути покупку зі скасованим сертифікатом"
+            )
+        }
+
+        if (
+            lockedCertificate.usedSessions > 0 ||
+            attendanceRepository.existsByCertificateCertificateId(
+                lockedCertificate.certificateId
+            )
+        ) {
+            throw ConflictException(
+                "Повернення неможливе: сертифікат уже використовувався"
+            )
+        }
+
+        if (
+            bookingRepository.existsByCertificateCertificateIdAndType(
+                lockedCertificate.certificateId,
+                BookingType.BOOKED
+            )
+        ) {
+            throw ConflictException(
+                "Сертифікат має активні бронювання. " +
+                        "Спочатку скасуйте відповідні бронювання"
+            )
+        }
+
 
         if (certificate.type == CertificateType.CANCELLED) {
             throw ConflictException(
                 "Неможливо виконати повернення для скасованого сертифіката"
-            )
-        }
-
-        if (certificate.usedSessions > 0) {
-            throw ConflictException(
-                "Неможливо виконати повне повернення, оскільки сертифікат уже використовувався"
             )
         }
 
@@ -269,22 +317,28 @@ class PurchaseService(
                     "Транзакцію оплати покупки не знайдено"
                 )
 
-        val account = incomeTransaction.account
+        val incomeAccount = incomeTransaction.account
             ?: throw IllegalStateException(
                 "Рахунок оплати покупки не знайдено"
             )
 
-        /*
-         * Рахунки в нашій системі не можуть мати
-         * від'ємний баланс.
-         */
-        val currentBalance =
-            financialTransactionRepository
-                .getAccountBalance(account.accountId)
+        val account = accountRepository
+            .findLockedByAccountIdAndClubClubId(
+                incomeAccount.accountId,
+                club.clubId
+            )
+            ?: throw NoSuchElementException(
+                "Рахунок оплати покупки не знайдено"
+            )
 
-        if (incomeTransaction.amount > currentBalance) {
+        val currentBalance =
+            financialTransactionRepository.getAccountBalance(
+                account.accountId
+            )
+
+        if (purchase.amount > currentBalance) {
             throw ConflictException(
-                "Недостатньо коштів на рахунку для виконання повернення"
+                "Недостатньо коштів на рахунку для повернення"
             )
         }
 
@@ -310,20 +364,13 @@ class PurchaseService(
         )
 
         purchase.type = PurchaseType.REFUNDED
+        lockedCertificate.type = CertificateType.CANCELLED
 
-        /*
-         * CANCELLED — бізнес-стан сертифіката.
-         * status залишається true, тому що запис
-         * не видалений і є частиною історії.
-         */
-        certificate.type = CertificateType.CANCELLED
+        certificateRepository.save(lockedCertificate)
 
-        certificateRepository.save(certificate)
-
-        val savedPurchase =
-            purchaseRepository.save(purchase)
-
-        return savedPurchase.toResponse()
+        return purchaseRepository
+            .save(purchase)
+            .toResponse()
     }
 
 
@@ -352,6 +399,134 @@ class PurchaseService(
 
             createdAt = createdAt,
             updatedAt = updatedAt
+        )
+    }
+
+
+    @Transactional(readOnly = true)
+    fun getPage(
+        jwt: Jwt,
+        page: Int,
+        size: Int,
+        year: Int,
+        month: Int,
+        type: PurchaseType?
+    ): PurchasePageResponse {
+
+        val user =
+            currentUserService.requireAdmin(jwt)
+
+        val clubId =
+            user.club?.clubId
+                ?: throw AccessDeniedException(
+                    "Користувач не прив'язаний до спортивного клубу"
+                )
+
+        if (page < 0) {
+            throw IllegalArgumentException(
+                "Номер сторінки не може бути від'ємним"
+            )
+        }
+
+        if (size !in 1..100) {
+            throw IllegalArgumentException(
+                "Кількість покупок на сторінці повинна бути від 1 до 100"
+            )
+        }
+
+        if (month !in 1..12) {
+            throw IllegalArgumentException(
+                "Некоректний номер місяця"
+            )
+        }
+
+        val yearMonth =
+            YearMonth.of(
+                year,
+                month
+            )
+
+        /*
+         * Purchase.createdAt — OffsetDateTime.
+         *
+         * Для меж календарного місяця
+         * використовуємо часовий пояс Києва,
+         * оскільки продажі переглядаються
+         * як локальні операції клубу.
+         */
+        val zone =
+            ZoneId.of("Europe/Kyiv")
+
+        val from =
+            yearMonth
+                .atDay(1)
+                .atStartOfDay(zone)
+                .toOffsetDateTime()
+
+        val to =
+            yearMonth
+                .plusMonths(1)
+                .atDay(1)
+                .atStartOfDay(zone)
+                .toOffsetDateTime()
+
+        val pageable =
+            PageRequest.of(
+                page,
+                size,
+                Sort.by(
+                    Sort.Order.desc(
+                        "createdAt"
+                    ),
+                    Sort.Order.desc(
+                        "purchaseId"
+                    )
+                )
+            )
+
+        val result =
+            if (type == null) {
+                purchaseRepository
+                    .findAllByClubClubIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                        clubId,
+                        from,
+                        to,
+                        pageable
+                    )
+            } else {
+                purchaseRepository
+                    .findAllByClubClubIdAndTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                        clubId,
+                        type,
+                        from,
+                        to,
+                        pageable
+                    )
+            }
+
+        return PurchasePageResponse(
+            content =
+                result.content.map {
+                    it.toResponse()
+                },
+
+            page =
+                result.number,
+
+            size =
+                result.size,
+
+            totalElements =
+                result.totalElements,
+
+            totalPages =
+                result.totalPages,
+
+            first =
+                result.isFirst,
+
+            last =
+                result.isLast
         )
     }
 }

@@ -21,7 +21,6 @@ class ServiceController(
     fun getAll(
         @AuthenticationPrincipal jwt: Jwt
     ): List<ServiceResponse> {
-
         return serviceService.getAll(jwt)
     }
 
@@ -30,7 +29,6 @@ class ServiceController(
         @PathVariable serviceId: Long,
         @AuthenticationPrincipal jwt: Jwt
     ): ServiceResponse {
-
         return serviceService.getById(serviceId, jwt)
     }
 
@@ -40,7 +38,6 @@ class ServiceController(
         @Valid @RequestBody request: CreateServiceRequest,
         @AuthenticationPrincipal jwt: Jwt
     ): ServiceResponse {
-
         return serviceService.createService(request, jwt)
     }
 
@@ -50,7 +47,6 @@ class ServiceController(
         @Valid @RequestBody request: UpdateServiceRequest,
         @AuthenticationPrincipal jwt: Jwt
     ): ServiceResponse {
-
         return serviceService.updateService(serviceId, request, jwt)
     }
 
@@ -58,7 +54,7 @@ class ServiceController(
     fun updateServiceStatus(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable serviceId: Long,
-        @RequestBody request: UpdateServiceStatusRequest
+        @Valid @RequestBody request: UpdateServiceStatusRequest
     ): ServiceResponse {
         return serviceService.updateServiceStatus(serviceId, request, jwt)
     }
@@ -69,7 +65,6 @@ class ServiceController(
         @PathVariable serviceId: Long,
         @AuthenticationPrincipal jwt: Jwt
     ) {
-
         serviceService.deleteService(serviceId, jwt)
     }
 }

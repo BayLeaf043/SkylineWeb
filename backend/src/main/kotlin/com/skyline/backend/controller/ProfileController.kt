@@ -16,6 +16,10 @@ class ProfileController(
     private val profileService: ProfileService
 ) {
 
+    /**
+     * ADMIN / TRAINER
+     * Повертає профіль поточного користувача
+     */
     @GetMapping
     fun getProfile(
         @AuthenticationPrincipal jwt: Jwt
@@ -24,18 +28,23 @@ class ProfileController(
     }
 
 
+    /**
+     * ADMIN / TRAINER.
+     * Оновлює особисті дані поточного користувача.
+     */
     @PutMapping
     fun updateProfile(
         @AuthenticationPrincipal jwt: Jwt,
         @Valid @RequestBody request: UpdateProfileRequest
     ): ProfileResponse {
-        return profileService.updateProfile(
-            jwt,
-            request
-        )
+        return profileService.updateProfile(jwt, request)
     }
 
 
+    /**
+     * ADMIN / TRAINER.
+     * Повертає інформацію про клуб поточного користувача.
+     */
     @GetMapping("/club")
     fun getClub(
         @AuthenticationPrincipal jwt: Jwt
@@ -44,14 +53,15 @@ class ProfileController(
     }
 
 
+    /**
+     * ADMIN.
+     * Оновлює інформацію про спортивний комплекс.
+     */
     @PutMapping("/club")
     fun updateClub(
         @AuthenticationPrincipal jwt: Jwt,
         @Valid @RequestBody request: UpdateClubProfileRequest
     ): ClubProfileResponse {
-        return profileService.updateClub(
-            jwt,
-            request
-        )
+        return profileService.updateClub(jwt, request)
     }
 }

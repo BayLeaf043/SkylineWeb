@@ -25,10 +25,7 @@ class EmployeeController(
         @AuthenticationPrincipal jwt: Jwt,
         @Valid @RequestBody request: CreateAdminRequest
     ): EmployeeResponse {
-        return employeeService.createAdmin(
-            jwt,
-            request
-        )
+        return employeeService.createAdmin(jwt, request)
     }
 
     @PostMapping("/trainers")
@@ -37,10 +34,7 @@ class EmployeeController(
         @AuthenticationPrincipal jwt: Jwt,
         @Valid @RequestBody request: CreateTrainerRequest
     ): EmployeeResponse {
-        return employeeService.createTrainer(
-            jwt,
-            request
-        )
+        return employeeService.createTrainer(jwt, request)
     }
 
     @GetMapping
@@ -55,10 +49,7 @@ class EmployeeController(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable userId: Long
     ): EmployeeResponse {
-        return employeeService.getEmployee(
-            jwt,
-            userId
-        )
+        return employeeService.getEmployee(jwt, userId)
     }
 
     @PutMapping("/{userId}")
@@ -67,24 +58,16 @@ class EmployeeController(
         @PathVariable userId: Long,
         @Valid @RequestBody request: UpdateEmployeeRequest
     ): EmployeeResponse {
-        return employeeService.updateEmployee(
-            jwt,
-            userId,
-            request
-        )
+        return employeeService.updateEmployee(jwt, userId, request)
     }
 
     @PatchMapping("/{userId}/status")
     fun updateEmployeeStatus(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable userId: Long,
-        @RequestBody request: UpdateEmployeeStatusRequest
+        @Valid @RequestBody request: UpdateEmployeeStatusRequest
     ): EmployeeResponse {
-        return employeeService.updateEmployeeStatus(
-            jwt,
-            userId,
-            request
-        )
+        return employeeService.updateEmployeeStatus(jwt, userId, request)
     }
 
     @DeleteMapping("/{userId}")
@@ -93,9 +76,6 @@ class EmployeeController(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable userId: Long
     ) {
-        employeeService.deleteEmployee(
-            jwt,
-            userId
-        )
+        employeeService.deleteEmployee(jwt, userId)
     }
 }

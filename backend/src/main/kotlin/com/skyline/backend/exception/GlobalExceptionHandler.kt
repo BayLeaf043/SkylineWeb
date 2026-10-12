@@ -1,13 +1,12 @@
 package com.skyline.backend.exception
 
 import org.springframework.http.HttpStatus
-import com.skyline.backend.exception.UnauthorizedException
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestControllerAdvice
-import org.springframework.http.ResponseEntity
+
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -37,7 +36,6 @@ class GlobalExceptionHandler {
     fun handleValidation(
         ex: MethodArgumentNotValidException
     ): ApiError {
-
         val message = ex.bindingResult
             .fieldErrors
             .firstOrNull()
@@ -50,7 +48,7 @@ class GlobalExceptionHandler {
             message = message
         )
     }
-    
+
     @ExceptionHandler(ConflictException::class)
     @ResponseStatus(HttpStatus.CONFLICT)
     fun handleConflict(
